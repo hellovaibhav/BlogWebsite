@@ -3,6 +3,20 @@
 const express = require("express");
 const bodyParser = require("body-parser");
 const ejs = require("ejs");
+const mongoose = require("mongoose");
+
+
+mongoose.set('strictQuery', "false");
+
+mongoose.connect('mongodb://localhost:27017/blogDB');
+
+const postSchema = mongoose.Schema({
+  title: String,
+  content: String,
+  truncatedContent: String
+});
+
+const Post = mongoose.model("Post", postSchema);
 
 const homeStartingContent =
   "Lacus vel facilisis volutpat est velit egestas dui id ornare. Semper auctor neque vitae tempus quam. Sit amet cursus sit amet dictum sit amet justo. Viverra tellus in hac habitasse. Imperdiet proin fermentum leo vel orci porta. Donec ultrices tincidunt arcu non sodales neque sodales ut. Mattis molestie a iaculis at erat pellentesque adipiscing. Magnis dis parturient montes nascetur ridiculus mus mauris vitae ultricies. Adipiscing elit ut aliquam purus sit amet luctus venenatis lectus. Ultrices vitae auctor eu augue ut lectus arcu bibendum at. Odio euismod lacinia at quis risus sed vulputate odio ut. Cursus mattis molestie a iaculis at erat pellentesque adipiscing.";
@@ -23,9 +37,14 @@ var _ = require("lodash");
 let posts = [];
 
 app.get("/", function (req, res) {
-  res.render("home", {
-    startingContent: homeStartingContent,
-    postsArray: posts,
+
+
+  Post.find({}, function (err, foundPost) {
+    console.log(foundPost)
+    res.render("home", {
+      startingContent: homeStartingContent,
+      postsArray: foundPost,
+    });
   });
 });
 
@@ -46,33 +65,46 @@ app.get("/compose", function (req, res) {
 });
 
 app.post("/compose", function (req, res) {
+
+
   const myString = req.body.postBody;
   const myTruncatedString = myString.substring(0, 100);
 
-  const post = {
+  const post = new Post({
     title: req.body.postTitle,
-    contentTruncated: myTruncatedString + "...",
-    contentFull:myString
-  };
+    content: req.body.postBody,
+    truncatedContent: myTruncatedString + "..."
+  });
 
-  posts.push(post);
+  post.save();
 
   res.redirect("/");
 });
 
 app.get("/posts/:topic", function (req, res) {
-  const requestedTitle = req.params.topic;
+  const requestedTitle = _.capitalize(req.params.topic);
 
-  posts.forEach(function (post) {
-    const storedTitle = post.title;
+  console.log(requestedTitle);
 
-    if (_.lowerCase(storedTitle) === _.lowerCase(requestedTitle)) {
-      console.log("Match Found");
+  Post.findOne({ title: requestedTitle }, function (err, foundPost) {
+    console.log(foundPost);
 
-      res.render("post", {
-        title: post.title,
-        content: post.contentFull,
-      });
+    if (!err) {
+      if (!foundPost) {
+        // creating a new list
+        res.render("post", {
+          title: "Dosent Exist",
+          content: "You need to compose the post to see it"
+        });
+
+      } else {
+        // Showing old list
+
+        res.render("post", {
+          title: foundPost.title,
+          content: foundPost.content
+        });
+      }
     }
   });
 });
